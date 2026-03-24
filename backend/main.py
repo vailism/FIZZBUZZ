@@ -43,7 +43,6 @@ OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
 if not MODEL_PATH.exists():
 	raise FileNotFoundError(f"YOLO model not found at: {MODEL_PATH}")
 
-# Load the YOLO model once at startup so prediction requests are fast.
 model = YOLO(str(MODEL_PATH))
 
 
@@ -171,7 +170,6 @@ async def predict(request: Request, file: UploadFile = File(...)) -> PredictResp
 
 		status = "THREAT" if threat_detected else "SAFE"
 
-		# Draw prediction boxes and save a rendered output image for downstream use.
 		plotted = result.plot()
 		output_name = f"prediction_{uuid.uuid4().hex}.jpg"
 		output_path = OUTPUTS_DIR / output_name

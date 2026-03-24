@@ -11,7 +11,17 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL
 const API_KEY = import.meta.env.VITE_API_KEY || ''
 const API_URL = `${API_BASE_URL}/predict`
 const HISTORY_KEY = 'xray-scan-history-v1'
+const THEME_KEY = 'xray-theme-v1'
 const MAX_HISTORY_ITEMS = 8
+
+const readStoredTheme = () => {
+  try {
+    const raw = localStorage.getItem(THEME_KEY)
+    return raw === 'light' ? 'light' : 'dark'
+  } catch {
+    return 'dark'
+  }
+}
 
 const readStoredHistory = () => {
   try {
@@ -24,50 +34,6 @@ const readStoredHistory = () => {
   }
 }
 
-// Animated grid background
-const GridBg = () => (
-  <div className="fixed inset-0 pointer-events-none z-0">
-    <div className="absolute inset-0 bg-grid opacity-100"
-      style={{
-        backgroundImage: 'linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px)',
-        backgroundSize: '40px 40px',
-      }}
-    />
-    {/* Radial vignette */}
-    <div className="absolute inset-0" style={{
-      background: 'radial-gradient(ellipse at center, transparent 40%, #060a14 100%)',
-    }} />
-    {/* Top glow */}
-    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-2/3 h-px"
-      style={{ background: 'linear-gradient(90deg, transparent, rgba(0,212,255,0.4), transparent)' }} />
-  </div>
-)
-
-// System header top bar
-const TopBar = () => (
-  <div className="flex items-center justify-between px-6 py-3 border-b"
-    style={{ borderColor: '#1a2540', background: 'rgba(6,10,20,0.9)' }}>
-    <div className="flex items-center gap-3">
-      <div className="flex gap-1.5">
-        <div className="w-2 h-2 rounded-full" style={{ background: '#ff2d55' }} />
-        <div className="w-2 h-2 rounded-full" style={{ background: '#ff9f00' }} />
-        <div className="w-2 h-2 rounded-full" style={{ background: '#00ff88' }} />
-      </div>
-      <span className="font-mono text-xs text-muted hidden sm:block">SECURE TERMINAL v4.2.1</span>
-    </div>
-    <div className="flex items-center gap-4">
-      <div className="flex items-center gap-1.5">
-        <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#00ff88' }} />
-        <span className="font-mono text-xs text-muted">SYS ONLINE</span>
-      </div>
-      <div className="hidden sm:flex items-center gap-1.5 font-mono text-xs text-muted">
-        <span style={{ color: '#3a4a6b' }}>UID:</span>
-        <span>SEC-7734</span>
-      </div>
-    </div>
-  </div>
-)
-
 export default function App() {
   const [imageFile, setImageFile] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
@@ -75,10 +41,58 @@ export default function App() {
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
   const [scanHistory, setScanHistory] = useState(readStoredHistory)
+  const [isBooting, setIsBooting] = useState(true)
+  const [theme, setTheme] = useState(readStoredTheme)
+  const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement))
+  const [posterMode, setPosterMode] = useState(false)
+  const [typedLine, setTypedLine] = useState('')
+
+  const heroLine = 'An out-of-the-world AI defense interface built to command attention during live demos.'
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setIsBooting(false), 2600)
+    return () => window.clearTimeout(timer)
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem(THEME_KEY, theme)
+  }, [theme])
+
+  useEffect(() => {
+    let idx = 0
+    setTypedLine('')
+    const timer = window.setInterval(() => {
+      idx += 1
+      setTypedLine(heroLine.slice(0, idx))
+      if (idx >= heroLine.length) {
+        window.clearInterval(timer)
+      }
+    }, 14)
+
+    return () => window.clearInterval(timer)
+  }, [heroLine])
 
   useEffect(() => {
     localStorage.setItem(HISTORY_KEY, JSON.stringify(scanHistory))
   }, [scanHistory])
+
+  useEffect(() => {
+    const onFullscreenChange = () => setIsFullscreen(Boolean(document.fullscreenElement))
+    document.addEventListener('fullscreenchange', onFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange)
+  }, [])
+
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen()
+      } else {
+        await document.exitFullscreen()
+      }
+    } catch {
+      setError('Fullscreen mode is not available in this browser context.')
+    }
+  }
 
   const handleImageChange = useCallback((file, preview) => {
     setImageFile(file)
@@ -128,9 +142,9 @@ export default function App() {
       if (err.code === 'ECONNABORTED') {
         setError('Request timed out. Backend may be overloaded.')
       } else if (err.response) {
-        setError(`Server error: ${err.response.status} — ${err.response.data?.detail || 'Unknown error'}`)
+        setError(`Server error: ${err.response.status} - ${err.response.data?.detail || 'Unknown error'}`)
       } else if (err.request) {
-        setError('Cannot reach backend at localhost:8000. Is the server running?')
+        setError('Cannot reach backend. Confirm the server is running.')
       } else {
         setError(`Unexpected error: ${err.message}`)
       }
@@ -140,240 +154,143 @@ export default function App() {
   }
 
   const isThreat = result?.status === 'THREAT'
+  const latest = scanHistory[0]
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: '#060a14' }}>
-      <GridBg />
-      <TopBar />
-
-      {/* Main content */}
-      <main className="relative z-10 flex-1 flex flex-col max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 gap-8">
-
-        {/* Title section */}
-        <div className="text-center space-y-3 animate-fade-in">
-          {/* Top label */}
-          <div className="flex items-center justify-center gap-3">
-            <div className="h-px flex-1 max-w-16" style={{ background: 'linear-gradient(90deg, transparent, #1a2540)' }} />
-            <span className="font-mono text-xs tracking-widest" style={{ color: '#3a4a6b' }}>
-              ◈ CLASSIFIED SYSTEM ◈
-            </span>
-            <div className="h-px flex-1 max-w-16" style={{ background: 'linear-gradient(90deg, #1a2540, transparent)' }} />
+    <div className={`app-shell ${posterMode ? 'poster-mode' : ''} ${theme === 'light' ? 'light-mode' : 'dark-mode'}`}>
+      {isBooting && (
+        <div className="lux-loader" onClick={() => setIsBooting(false)}>
+          <div className="lux-loader-noise" />
+          <div className="lux-loader-center">
+            <img src="/logo-citadel.svg" alt="Citadel logo" className="lux-loader-logo" />
+            <p className="lux-loader-brand">CITADEL</p>
+            <div className="lux-loader-track" aria-hidden="true">
+              <span />
+            </div>
+            <p className="lux-loader-sub">Intelligence suite initializing</p>
           </div>
-
-          {/* Main title */}
-          <div className="relative inline-block">
-            <h1 className="font-display font-black text-2xl sm:text-3xl lg:text-4xl tracking-wider"
-              style={{
-                background: 'linear-gradient(135deg, #e2e8f0 30%, #00d4ff 70%, #e2e8f0 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-                letterSpacing: '0.05em',
-              }}>
-              AI-Powered X-Ray Threat Detection
-            </h1>
-            {/* Underline glow */}
-            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-3/4 h-px"
-              style={{ background: 'linear-gradient(90deg, transparent, rgba(0,212,255,0.5), transparent)' }} />
-          </div>
-
-          <p className="font-body text-sm text-muted max-w-xl mx-auto">
-            Upload X-ray imagery for real-time AI-driven threat identification and classification
-          </p>
         </div>
+      )}
 
-        {/* Main panels */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left panel - Upload */}
-          <div className="glass rounded-2xl p-5 relative" style={{ border: '1px solid #1a2540' }}>
-            {/* Corner marks */}
-            <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 rounded-tl-xl"
-              style={{ borderColor: '#00d4ff55' }} />
-            <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 rounded-tr-xl"
-              style={{ borderColor: '#00d4ff55' }} />
-            <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 rounded-bl-xl"
-              style={{ borderColor: '#00d4ff55' }} />
-            <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 rounded-br-xl"
-              style={{ borderColor: '#00d4ff55' }} />
+      <div className="orb orb-one" />
+      <div className="orb orb-two" />
+      <div className="mesh-grid" />
 
-            <UploadBox
-              image={imagePreview}
-              onImageChange={handleImageChange}
-              onClear={handleClear}
-            />
+      <header className="top-nav">
+        <div className="brand-wrap">
+          <img src="/favicon.svg" alt="Citadel mark" className="brand-logo" />
+          <p className="brand-title">CITADEL SECURITY LAB</p>
+        </div>
+        <div className="pill-row">
+          <span className="status-pill">YOLOv8 ACTIVE</span>
+          <span className="status-pill">LIVE ANALYSIS</span>
+          <button className="present-btn" type="button" onClick={() => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'))}>
+            {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+          </button>
+          <button className="present-btn theme-btn" type="button" onClick={() => setPosterMode(prev => !prev)}>
+            {posterMode ? 'Back to Neon' : 'Screenshot Mode'}
+          </button>
+          <button className="present-btn" type="button" onClick={toggleFullscreen}>
+            {isFullscreen ? 'Exit Present Mode' : 'Present Mode'}
+          </button>
+        </div>
+      </header>
+
+      <main className="main-wrap">
+        <section className="hero-block reveal-up">
+          <p className="hero-kicker">AEROSCAN SUITE</p>
+          <h1 className="hero-title">X-ray Threat Intelligence Console</h1>
+          <p className="hero-copy">{typedLine}<span className="typing-caret">|</span></p>
+          <div className="hero-bars" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
           </div>
+        </section>
 
-          {/* Right panel - Result */}
-          <div
-            className={`glass rounded-2xl p-5 relative transition-all duration-700 ${
-              isThreat ? 'threat-active' : result?.status === 'SAFE' ? 'safe-active' : ''
-            }`}
-            style={{ border: '1px solid #1a2540' }}
-          >
-            {/* Corner marks */}
-            <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 rounded-tl-xl"
-              style={{ borderColor: isThreat ? '#ff2d5555' : result?.status === 'SAFE' ? '#00ff8855' : '#00d4ff55' }} />
-            <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 rounded-tr-xl"
-              style={{ borderColor: isThreat ? '#ff2d5555' : result?.status === 'SAFE' ? '#00ff8855' : '#00d4ff55' }} />
-            <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 rounded-bl-xl"
-              style={{ borderColor: isThreat ? '#ff2d5555' : result?.status === 'SAFE' ? '#00ff8855' : '#00d4ff55' }} />
-            <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 rounded-br-xl"
-              style={{ borderColor: isThreat ? '#ff2d5555' : result?.status === 'SAFE' ? '#00ff8855' : '#00d4ff55' }} />
+        <section className="panel-grid">
+          <article className="neo-card card-upload reveal-up delay-1">
+            <UploadBox image={imagePreview} onImageChange={handleImageChange} onClear={handleClear} />
+          </article>
 
+          <article className={`neo-card card-result reveal-up delay-2 ${isThreat ? 'card-danger' : result?.status === 'SAFE' ? 'card-safe' : ''}`}>
             <ResultBox
+              inputImage={imagePreview}
               resultImage={result?.output_image_path}
               detections={result?.detections}
               status={result?.status}
               isLoading={isLoading}
             />
-          </div>
-        </div>
+          </article>
+        </section>
 
-        {/* Error message */}
         {error && (
-          <div className="animate-slide-up flex items-start gap-3 px-4 py-3 rounded-xl"
-            style={{ background: 'rgba(255,45,85,0.08)', border: '1px solid rgba(255,45,85,0.3)' }}>
-            <span className="text-threat text-sm mt-0.5 flex-shrink-0">⚠</span>
-            <div>
-              <p className="font-mono text-xs font-bold text-threat mb-0.5">CONNECTION ERROR</p>
-              <p className="font-mono text-xs text-threat/80">{error}</p>
-            </div>
+          <div className="error-banner reveal-up">
+            <span className="error-label">Connection error</span>
+            <p>{error}</p>
           </div>
         )}
 
-        {/* Status bar */}
-        <StatusBar
-          status={result?.status}
-          isLoading={isLoading}
-          detections={result?.detections}
-        />
+        <StatusBar status={result?.status} isLoading={isLoading} detections={result?.detections} />
 
-        {/* Scan history */}
-        <div className="glass rounded-2xl p-4" style={{ border: '1px solid #1a2540' }}>
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-2 h-2 rounded-full" style={{ background: '#00d4ff' }} />
-            <span className="font-mono text-xs text-muted tracking-widest uppercase">Recent Scans</span>
-            <div className="flex-1 h-px" style={{ background: '#1a2540' }} />
-          </div>
-
-          {scanHistory.length === 0 ? (
-            <p className="font-mono text-xs" style={{ color: '#3a4a6b' }}>No scans yet in this browser session.</p>
-          ) : (
-            <div className="space-y-2">
-              {scanHistory.map(item => (
-                <div key={item.id} className="flex items-center justify-between px-3 py-2 rounded-lg"
-                  style={{ background: 'rgba(10,14,26,0.6)', border: '1px solid #1a2540' }}>
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-xs" style={{ color: '#6b82a6', minWidth: '70px' }}>{item.at}</span>
-                    <span className="font-mono text-xs px-2 py-0.5 rounded"
-                      style={{
-                        color: item.status === 'THREAT' ? '#ff2d55' : '#00ff88',
-                        background: item.status === 'THREAT' ? 'rgba(255,45,85,0.12)' : 'rgba(0,255,136,0.12)',
-                        border: item.status === 'THREAT' ? '1px solid rgba(255,45,85,0.3)' : '1px solid rgba(0,255,136,0.3)',
-                      }}>
-                      {item.status}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-xs" style={{ color: '#4a6a8a' }}>{item.topClass}</span>
-                    <span className="font-mono text-xs" style={{ color: '#ff9f00' }}>
-                      {Math.round((item.confidence || 0) * 100)}%
-                    </span>
-                  </div>
-                </div>
-              ))}
+        <section className="panel-grid-lower">
+          <article className="neo-card history-card reveal-up delay-1">
+            <div className="history-header">
+              <h2>Recent Scans</h2>
+              <span>{scanHistory.length} records</span>
             </div>
-          )}
-        </div>
 
-        {/* Action buttons */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <button
-            onClick={handleAnalyze}
-            disabled={!imageFile || isLoading}
-            className={`btn-primary relative flex items-center justify-center gap-3 px-10 py-4 rounded-xl font-display font-bold tracking-widest text-sm transition-all duration-300
-              ${imageFile && !isLoading
-                ? 'hover:scale-[1.02] hover:shadow-lg cursor-pointer'
-                : 'opacity-40 cursor-not-allowed'
-              }`}
-            style={{
-              background: imageFile && !isLoading
-                ? 'linear-gradient(135deg, #0f2a4a, #0a1e3a)'
-                : 'rgba(26,37,64,0.4)',
-              border: imageFile && !isLoading
-                ? '1px solid rgba(0,212,255,0.5)'
-                : '1px solid #1a2540',
-              color: imageFile && !isLoading ? '#00d4ff' : '#3a4a6b',
-              boxShadow: imageFile && !isLoading
-                ? '0 0 20px rgba(0,212,255,0.15), inset 0 0 20px rgba(0,212,255,0.03)'
-                : 'none',
-            }}
-          >
-            {isLoading ? (
-              <>
-                <svg width="16" height="16" viewBox="0 0 16 16" className="spinner-ring">
-                  <circle cx="8" cy="8" r="6" fill="none" stroke="#00d4ff44" strokeWidth="2" />
-                  <circle cx="8" cy="8" r="6" fill="none" stroke="#00d4ff" strokeWidth="2"
-                    strokeLinecap="round" strokeDasharray="37" strokeDashoffset="28"
-                  />
-                </svg>
-                ANALYZING...
-              </>
+            {scanHistory.length === 0 ? (
+              <p className="history-empty">No scans recorded yet in this browser.</p>
             ) : (
-              <>
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path d="M2 8 C2 4.7 4.7 2 8 2 C11.3 2 14 4.7 14 8 C14 11.3 11.3 14 8 14"
-                    stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                  <circle cx="8" cy="8" r="2.5" fill="currentColor" />
-                  <path d="M8 14 L6 11.5 L10 11.5 Z" fill="currentColor" />
-                </svg>
-                RUN ANALYSIS
-              </>
+              <div className="history-list">
+                {scanHistory.map(item => (
+                  <div key={item.id} className="history-item">
+                    <div className="history-left">
+                      <p className="history-time">{item.at}</p>
+                      <span className={`history-badge ${item.status === 'THREAT' ? 'threat' : 'safe'}`}>{item.status}</span>
+                    </div>
+                    <div className="history-right">
+                      <p>{item.topClass}</p>
+                      <span>{Math.round((item.confidence || 0) * 100)}%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
-          </button>
+          </article>
 
-          <button
-            onClick={handleClear}
-            disabled={isLoading}
-            className="flex items-center justify-center gap-2 px-8 py-4 rounded-xl font-display font-bold tracking-widest text-sm transition-all duration-300 hover:scale-[1.01] cursor-pointer"
-            style={{
-              background: 'rgba(255,45,85,0.05)',
-              border: '1px solid rgba(255,45,85,0.2)',
-              color: '#6b82a6',
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.color = '#ff2d55'
-              e.currentTarget.style.borderColor = 'rgba(255,45,85,0.5)'
-              e.currentTarget.style.background = 'rgba(255,45,85,0.08)'
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.color = '#6b82a6'
-              e.currentTarget.style.borderColor = 'rgba(255,45,85,0.2)'
-              e.currentTarget.style.background = 'rgba(255,45,85,0.05)'
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M2 2L12 12M12 2L2 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-            CLEAR SESSION
-          </button>
-        </div>
-
-        {/* Footer info strip */}
-        <div className="flex flex-wrap items-center justify-center gap-6 py-3 border-t"
-          style={{ borderColor: '#1a2540' }}>
-          {[
-            { label: 'MODEL', value: 'YOLOv8-SEC' },
-            { label: 'ACCURACY', value: '97.4%' },
-            { label: 'LATENCY', value: '<200ms' },
-            { label: 'CLASSES', value: '12 THREATS' },
-          ].map(({ label, value }) => (
-            <div key={label} className="flex items-center gap-2">
-              <span className="font-mono text-xs" style={{ color: '#2a3a5a' }}>{label}</span>
-              <span className="font-mono text-xs font-bold" style={{ color: '#4a6a8a' }}>{value}</span>
+          <article className="neo-card quick-glance reveal-up delay-2">
+            <h2>Quick Glance</h2>
+            <div className="glance-grid">
+              <div>
+                <p>Model</p>
+                <strong>YOLOv8-SEC</strong>
+              </div>
+              <div>
+                <p>Latest status</p>
+                <strong>{latest?.status || 'STANDBY'}</strong>
+              </div>
+              <div>
+                <p>Top class</p>
+                <strong>{latest?.topClass || 'none'}</strong>
+              </div>
+              <div>
+                <p>Confidence</p>
+                <strong>{latest ? `${Math.round((latest.confidence || 0) * 100)}%` : '0%'}</strong>
+              </div>
             </div>
-          ))}
-        </div>
+          </article>
+        </section>
+
+        <section className="cta-row reveal-up delay-2">
+          <button onClick={handleAnalyze} disabled={!imageFile || isLoading} className="btn-run">
+            {isLoading ? 'ANALYZING...' : 'RUN ANALYSIS'}
+          </button>
+          <button onClick={handleClear} disabled={isLoading} className="btn-clear">CLEAR SESSION</button>
+        </section>
       </main>
     </div>
   )

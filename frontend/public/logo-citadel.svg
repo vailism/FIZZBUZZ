@@ -1,0 +1,47 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3B4B5C"/>
+      <stop offset="1" stop-color="#1A2637"/>
+    </linearGradient>
+    <linearGradient id="copper" x1="74" y1="74" x2="438" y2="438" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D7A980"/>
+      <stop offset="1" stop-color="#9C6E49"/>
+    </linearGradient>
+    <filter id="soft" x="0" y="0" width="512" height="512" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="0.8"/>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="4" fill="url(#bg)"/>
+
+  <g filter="url(#soft)">
+    <g stroke="url(#copper)" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="256" cy="185" r="130"/>
+      <path d="M110 176H215"/>
+      <path d="M297 176H402"/>
+      <path d="M110 176C130 202 152 212 180 212C197 212 207 205 215 194"/>
+      <path d="M402 176C382 202 360 212 332 212C315 212 305 205 297 194"/>
+      <path d="M256 132C268 132 280 138 286 146C277 148 271 151 266 158"/>
+      <path d="M248 152C239 158 237 168 238 178C246 179 252 177 258 173"/>
+      <path d="M256 152V244"/>
+      <path d="M232 244L256 262L280 244"/>
+      <path d="M173 240H339V287H173V240Z"/>
+      <path d="M173 240L155 258V287H190"/>
+      <path d="M339 240L357 258V287H322"/>
+      <path d="M236 287V309C236 322 246 332 256 332C266 332 276 322 276 309V287"/>
+      <path d="M166 226V240"/>
+      <path d="M190 226V240"/>
+      <path d="M322 226V240"/>
+      <path d="M346 226V240"/>
+      <circle cx="218" cy="174" r="13"/>
+      <path d="M218 165V183"/>
+      <path d="M209 174H227"/>
+      <path d="M289 192C301 183 312 184 320 191C312 201 300 206 286 206"/>
+    </g>
+
+    <text x="256" y="430" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="74" letter-spacing="8" fill="url(#copper)">
+      CITADEL
+    </text>
+  </g>
+</svg>
